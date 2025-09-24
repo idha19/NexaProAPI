@@ -12,6 +12,6 @@ namespace NexaProAPI.Data
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Account> Accounts { get; set; }
         public DbSet<Product> Products { get; set; }
-        public DbSet<Topup> Topups { get; set; }
+        public DbSet<Transaction> Transactions { get; set; }
     }
 }

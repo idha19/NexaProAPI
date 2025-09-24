@@ -75,54 +75,5 @@ namespace NexaProAPI.Controllers
 
             return Ok(response);
         }
-
-        //Admin update order item
-
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<OrderItemResponseDto>> UpdateOrderItem(int id, [FromBody] UpdateOrderItemDto dto)
-        {
-            var orderItem = await _context.OrderItems
-                .Include(oi => oi.Order)
-                .FirstOrDefaultAsync(oi => oi.Id == id);
-
-            if (orderItem == null)
-                return NotFound("Order item tidak ditemukan");
-
-            // update field
-            orderItem.Quantity = dto.Quantity;
-            orderItem.SubPrice = dto.SubPrice;
-
-            // (opsional) ganti account
-            if (dto.AccountId.HasValue)
-                orderItem.AccountId = dto.AccountId.Value;
-
-            // update total harga order induknya
-            var order = orderItem.Order;
-            if (order != null)
-            {
-                order.TotalPrice = await _context.OrderItems
-                    .Where(oi => oi.OrderId == order.Id)
-                    //.SumAsync(oi => oi.SubPrice * oi.Quantity);
-                    .SumAsync(oi => oi.SubPrice);
-        }
-
-            await _context.SaveChangesAsync();
-
-            // mapping response
-            var response = new OrderItemResponseDto
-            {
-                Id = orderItem.Id,
-                //OrderId = orderItem.OrderId,
-                AccountId = orderItem.AccountId,
-                ProductName = orderItem.Account?.Product?.Name ?? string.Empty,
-                Specification = orderItem.Account?.Specification ?? string.Empty,
-                Quantity = orderItem.Quantity,
-                SubPrice = orderItem.SubPrice,
-                //OrderedBy = orderItem.Order?.User?.Username ?? "Unknown"
-            };
-
-            return Ok(response);
-        }
     }
 }

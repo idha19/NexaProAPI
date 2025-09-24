@@ -31,6 +31,9 @@ namespace NexaProAPI.Controllers
             var customer = await _context.Users.FindAsync(userId);
             if (customer == null) return Unauthorized("Customer tidak ditemukan.");
 
+            var user = await _context.Users.FindAsync(userId);
+
+            if (user == null) return Unauthorized("User tidak ditemukan.");
 
             //Mulai transaksi kalau proses order gagal misal stok kurang, saldo kurang, dll.
             //Maka sldo customer saldo admin, dan stok account tidak boleh berubah.
@@ -98,6 +101,32 @@ namespace NexaProAPI.Controllers
                 order.TotalPrice = totalPrice;
 
                 _context.Orders.Add(order);
+
+
+                //PENTING YANG BAGIAN TRANSACTION
+                // Catat transaksi customer (Purchase Order)
+                _context.Transactions.Add(new Transaction
+                {
+                    UserId = customer.Id,
+                    Amount = -order.TotalPrice,   // saldo customer berkurang
+                    Type = "Purchase Order",
+                    TransactionDate = DateTime.UtcNow
+                });
+
+                // Catat transaksi admin (Income from Order)
+                if (admin != null)
+                {
+                    _context.Transactions.Add(new Transaction
+                    {
+                        UserId = admin.Id,
+                        Amount = order.TotalPrice,  // saldo admin bertambah
+                        Type = "Income from Order",
+                        TransactionDate = DateTime.UtcNow
+                    });
+                }
+                //SAMPAI SINI
+
+
                 await _context.SaveChangesAsync();
 
                 //PENTING: COMMIT TRANSAKSI AGAR PERUBAHAN SIMPAN DATA BENER2 KESIMPEN
@@ -112,19 +141,22 @@ namespace NexaProAPI.Controllers
                 var response = new OrderResponseDto
                 {
                     Id = savedOrder.Id,
-                    Username = savedOrder.User?.Username ?? "Unknown",
+                    Username = user.Username,
                     OrderDate = savedOrder.OrderDate,
                     TotalPrice = savedOrder.TotalPrice,
                     Items = savedOrder.Items.Select(i => new OrderItemResponseDto
                     {
                         Id = i.Id,
                         AccountId = i.AccountId,
+                        Username = i.Order?.User?.Username ?? "Unknown",
                         ProductName = i.Account?.Product?.Name ?? string.Empty,
                         Specification = i.Account?.Specification ?? string.Empty,
                         Quantity = i.Quantity,
                         SubPrice = i.SubPrice
                     }).ToList()
                 };
+
+
 
                 return Ok(response);
             }
@@ -136,7 +168,8 @@ namespace NexaProAPI.Controllers
             }
         }
 
-            //Customer lihat riwayat orderannya
+            
+        //Customer lihat riwayat orderannya
             
         [HttpGet("my-orders")]
         [Authorize(Roles =  "Customer")]
@@ -164,12 +197,15 @@ namespace NexaProAPI.Controllers
                 {
                     Id = i.Id,
                     AccountId = i.AccountId,
+                    Username = username,
                     ProductName = i.Account?.Product?.Name ?? string.Empty,
                     Specification = i.Account?.Specification ?? string.Empty,
                     Quantity = i.Quantity,
                     SubPrice = i.SubPrice
                 }).ToList()
             });
+
+            
 
             return Ok(response);
         }
@@ -194,6 +230,7 @@ namespace NexaProAPI.Controllers
                 {
                     Id = i.Id,
                     AccountId = i.AccountId,
+                    //Username = i.Order?.User?.Username ?? "Unknown",
                     ProductName = i.Account?.Product?.Name ?? string.Empty,
                     Specification = i.Account?.Specification ?? string.Empty,
                     Quantity = i.Quantity,
@@ -203,6 +240,5 @@ namespace NexaProAPI.Controllers
 
             return Ok(response);
         }
-
     }
 }

@@ -12,7 +12,7 @@ using NexaProAPI.Data;
 namespace NexaProAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250923035940_InitialCreate")]
+    [Migration("20250924043232_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -135,7 +135,7 @@ namespace NexaProAPI.Migrations
                     b.ToTable("Products");
                 });
 
-            modelBuilder.Entity("NexaProAPI.Models.Topup", b =>
+            modelBuilder.Entity("NexaProAPI.Models.Transaction", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -146,7 +146,7 @@ namespace NexaProAPI.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(10,2)");
 
-                    b.Property<DateTime>("TopupDate")
+                    b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("Type")
@@ -160,7 +160,7 @@ namespace NexaProAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Topups");
+                    b.ToTable("Transactions");
                 });
 
             modelBuilder.Entity("NexaProAPI.Models.User", b =>
@@ -242,7 +242,7 @@ namespace NexaProAPI.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("NexaProAPI.Models.Topup", b =>
+            modelBuilder.Entity("NexaProAPI.Models.Transaction", b =>
                 {
                     b.HasOne("NexaProAPI.Models.User", "User")
                         .WithMany()

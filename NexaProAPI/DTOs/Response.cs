@@ -5,7 +5,7 @@
         public int Id { get; set; }
         public string Username { get; set; } = string.Empty;
         public DateTime OrderDate { get; set; }
-        public decimal TotalPrice { get; set; }
+        public decimal TotalPrice { get; set; } 
         public List<OrderItemResponseDto> Items { get; set; } = new List<OrderItemResponseDto>();
     }
 
