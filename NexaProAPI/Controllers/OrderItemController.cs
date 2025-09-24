@@ -55,7 +55,7 @@ namespace NexaProAPI.Controllers
         {
             var items = await _context.OrderItems
                 .Include(oi => oi.Order)
-                .ThenInclude(oi => oi.User)
+                .ThenInclude(o => o.User)
                 .Include(oi => oi.Account)
                 .ThenInclude(a => a.Product)
                 .ToListAsync();
@@ -64,6 +64,7 @@ namespace NexaProAPI.Controllers
             {
                 Id = oi.Id,
                 //OrderId = oi.OrderId,
+                Username = oi.Order?.User?.Username ?? "Unknown",
                 AccountId = oi.AccountId,
                 ProductName = oi.Account?.Product?.Name ?? string.Empty,
                 Specification = oi.Account?.Specification ?? string.Empty,
@@ -102,8 +103,9 @@ namespace NexaProAPI.Controllers
             {
                 order.TotalPrice = await _context.OrderItems
                     .Where(oi => oi.OrderId == order.Id)
-                    .SumAsync(oi => oi.SubPrice * oi.Quantity);
-            }
+                    //.SumAsync(oi => oi.SubPrice * oi.Quantity);
+                    .SumAsync(oi => oi.SubPrice);
+        }
 
             await _context.SaveChangesAsync();
 

@@ -13,6 +13,7 @@
     {
         public int Id { get; set; }
         public int AccountId { get; set; }
+        public string Username { get; set; } = string.Empty;
         public string ProductName { get; set; } = string.Empty;
         public string Specification { get; set; } = string.Empty;
         public int Quantity { get; set; }
