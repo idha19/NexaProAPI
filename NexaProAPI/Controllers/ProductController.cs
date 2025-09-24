@@ -28,6 +28,7 @@ namespace NexaProAPI.Controllers
 
             var result = products.Select(p => new ProductDto
             {
+                Id = p.Id,
                 Name = p.Name,
                 Logo = p.Logo,
                 Category = p.Category.ToString() // enum → string
@@ -46,6 +47,7 @@ namespace NexaProAPI.Controllers
 
             var result = new ProductDto
             {
+                Id = product.Id,
                 Name = product.Name,
                 Logo = product.Logo,
                 Category = product.Category.ToString() // enum → string
@@ -65,7 +67,7 @@ namespace NexaProAPI.Controllers
             // Convert string → enum
             if (!Enum.TryParse<ProductCategory>(dto.Category, true, out var category))
             {
-                return BadRequest("Kategori tidak valid. Hanya 'Game' atau 'Entertainment'.");
+                return BadRequest("Kategori tidak valid. Hanya 'Software_editing' atau 'Streaming'.");
             }
 
             var product = new Product
@@ -81,6 +83,7 @@ namespace NexaProAPI.Controllers
             // response tetap string biar konsisten dengan DTO
             var result = new ProductDto
             {
+                Id = product.Id,
                 Name = product.Name,
                 Logo = product.Logo,
                 Category = product.Category.ToString()
@@ -115,6 +118,7 @@ namespace NexaProAPI.Controllers
                 message = "Produk berhasil diupdate.",
                 product = new ProductDto
                 {
+                    Id = product.Id,
                     Name = product.Name,
                     Logo = product.Logo,
                     Category = product.Category.ToString()

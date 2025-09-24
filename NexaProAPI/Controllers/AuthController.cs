@@ -53,6 +53,7 @@ namespace NexaProAPI.Controllers
                 return Ok(new
                 {
                     message = "Login berhasil",
+                    username = dto.Username,
                     token
                 });
             }
