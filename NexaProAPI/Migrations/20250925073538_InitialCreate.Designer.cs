@@ -12,7 +12,7 @@ using NexaProAPI.Data;
 namespace NexaProAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250924043232_InitialCreate")]
+    [Migration("20250925073538_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -57,6 +57,32 @@ namespace NexaProAPI.Migrations
                     b.ToTable("Accounts");
                 });
 
+            modelBuilder.Entity("NexaProAPI.Models.DeliveryCredential", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("OrderItemId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Password")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderItemId");
+
+                    b.ToTable("DeliveryCredentials");
+                });
+
             modelBuilder.Entity("NexaProAPI.Models.Order", b =>
                 {
                     b.Property<int>("Id")
@@ -67,6 +93,10 @@ namespace NexaProAPI.Migrations
 
                     b.Property<DateTime>("OrderDate")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.Property<decimal>("TotalPrice")
                         .HasColumnType("decimal(10,2)");
@@ -146,6 +176,10 @@ namespace NexaProAPI.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(10,2)");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime(6)");
 
@@ -212,6 +246,17 @@ namespace NexaProAPI.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("NexaProAPI.Models.DeliveryCredential", b =>
+                {
+                    b.HasOne("NexaProAPI.Models.OrderItem", "OrderItem")
+                        .WithMany("Credentials")
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrderItem");
+                });
+
             modelBuilder.Entity("NexaProAPI.Models.Order", b =>
                 {
                     b.HasOne("NexaProAPI.Models.User", "User")
@@ -256,6 +301,11 @@ namespace NexaProAPI.Migrations
             modelBuilder.Entity("NexaProAPI.Models.Order", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("NexaProAPI.Models.OrderItem", b =>
+                {
+                    b.Navigation("Credentials");
                 });
 #pragma warning restore 612, 618
         }

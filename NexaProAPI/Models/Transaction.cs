@@ -13,6 +13,7 @@ namespace NexaProAPI.Models
         [Column(TypeName = "decimal(10,2)")]
         public decimal Amount { get; set; }
         public string Type { get; set; } = string.Empty; //topup, purchace order, income order
+        public string Description { get; set; } = string.Empty;
         public DateTime TransactionDate { get; set; }
     }
 }

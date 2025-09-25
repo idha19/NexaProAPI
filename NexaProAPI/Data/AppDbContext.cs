@@ -13,5 +13,6 @@ namespace NexaProAPI.Data
         public DbSet<Account> Accounts { get; set; }
         public DbSet<Product> Products { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
+        public DbSet<DeliveryCredential> DeliveryCredentials { get; set; }
     }
 }

@@ -12,8 +12,9 @@
     }
     public class UpdateOrderItemDto
     {
-        public int Quantity { get; set; }
-        public decimal SubPrice { get; set; }
-        public int? AccountId { get; set; }
+        //public int Quantity { get; set; }
+        //public decimal SubPrice { get; set; }
+        //public int? AccountId { get; set; }
+        public string Status { get; set; } = "Pending";
     }
 }

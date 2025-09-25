@@ -18,227 +18,238 @@ namespace NexaProAPI.Controllers
             _context = context;
         }
 
-        //Customer buat pesanan
-        [HttpPost]
+        // 1. Customer Add to Cart
+        [HttpPost("add-to-cart")]
         [Authorize(Roles = "Customer")]
-        public async Task<ActionResult<OrderResponseDto>> CreateOrder([FromBody] CreateOrderDto dto)
+        public async Task<ActionResult<OrderResponseDto>> AddToCart([FromBody] CreateOrderDto dto)
         {
-            // Ambil userId dari JWT
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userIdClaim == null) return Unauthorized("User tidak valid.");
-            int userId = int.Parse(userIdClaim);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-            var customer = await _context.Users.FindAsync(userId);
-            if (customer == null) return Unauthorized("Customer tidak ditemukan.");
+            var order = await _context.Orders
+                .Include(o => o.Items).ThenInclude(i => i.Account).ThenInclude(a => a.Product)
+                .Include(O => O.User)
+                .Include(o => o.Items).ThenInclude(i => i.Credentials)
+                .FirstOrDefaultAsync(o => o.UserId == userId && o.Status == "Cart");
 
-            var user = await _context.Users.FindAsync(userId);
-
-            if (user == null) return Unauthorized("User tidak ditemukan.");
-
-            //Mulai transaksi kalau proses order gagal misal stok kurang, saldo kurang, dll.
-            //Maka sldo customer saldo admin, dan stok account tidak boleh berubah.
-            using var transaction = await _context.Database.BeginTransactionAsync();
-
-
-            try
+            if (order == null)
             {
-
-                var order = new Order
+                order = new Order
                 {
                     UserId = userId,
+                    Status = "Cart",
                     OrderDate = DateTime.UtcNow,
                     Items = new List<OrderItem>()
                 };
+                _context.Orders.Add(order);
+            }
 
-                decimal totalPrice = 0m;
+            foreach (var item in dto.Items)
+            {
+                var account = await _context.Accounts.FindAsync(item.AccountId);
+                if (account == null) return NotFound($"Account {item.AccountId} tidak ditemukan.");
 
-                // Loop setiap item
-                foreach (var item in dto.Items)
+                var existing = order.Items.FirstOrDefault(i => i.AccountId == item.AccountId);
+                if (existing != null)
                 {
-                    var account = await _context.Accounts
-                        .Include(a => a.Product) // agar bisa akses nama Product
-                        .FirstOrDefaultAsync(a => a.Id == item.AccountId);
-
-                    if (account == null)
-                        return NotFound($"Account dengan id {item.AccountId} tidak ditemukan.");
-
-                    if (account.Count < item.Quantity)
-                        return BadRequest($"Stock account {account.Specification} tidak cukup. Tersisa: {account.Count}");
-
-                    // Kurangi stock
-                    account.Count -= item.Quantity;
-
-                    // Hitung subtotal
-                    decimal subTotal = account.Price * item.Quantity;
-                    totalPrice += subTotal;
-
-                    // Tambahkan ke order items
+                    existing.Quantity += item.Quantity;
+                    existing.SubPrice = existing.Quantity * account.Price;
+                }
+                else
+                {
                     order.Items.Add(new OrderItem
                     {
                         AccountId = account.Id,
                         Quantity = item.Quantity,
-                        SubPrice = subTotal
+                        SubPrice = account.Price * item.Quantity
                     });
                 }
-
-                //pengecekan saldo customer
-                if (customer.Saldo < totalPrice)
-                {
-                    return BadRequest($"Saldo tidak cukup. Saldo anda: {customer.Saldo}, Total order: {totalPrice}");
-                }
-
-                //kurangi saldo customer
-                customer.Saldo -= totalPrice;
-
-                //Tambahkan saldo ke admin
-                var admin = await _context.Users.FirstOrDefaultAsync(u => u.Role == "Admin");
-                if (admin != null)
-                {
-                    admin.Saldo += totalPrice;
-                }
-
-                // Simpan total
-                order.TotalPrice = totalPrice;
-
-                _context.Orders.Add(order);
-
-
-                //PENTING YANG BAGIAN TRANSACTION
-                // Catat transaksi customer (Purchase Order)
-                _context.Transactions.Add(new Transaction
-                {
-                    UserId = customer.Id,
-                    Amount = -order.TotalPrice,   // saldo customer berkurang
-                    Type = "Purchase Order",
-                    TransactionDate = DateTime.UtcNow
-                });
-
-                // Catat transaksi admin (Income from Order)
-                if (admin != null)
-                {
-                    _context.Transactions.Add(new Transaction
-                    {
-                        UserId = admin.Id,
-                        Amount = order.TotalPrice,  // saldo admin bertambah
-                        Type = "Income from Order",
-                        TransactionDate = DateTime.UtcNow
-                    });
-                }
-                //SAMPAI SINI
-
-
-                await _context.SaveChangesAsync();
-
-                //PENTING: COMMIT TRANSAKSI AGAR PERUBAHAN SIMPAN DATA BENER2 KESIMPEN
-                await transaction.CommitAsync();
-
-                // Ambil order yang sudah tersimpan
-                var savedOrder = await _context.Orders
-                    .Include(o => o.Items).ThenInclude(i => i.Account).ThenInclude(a => a.Product)
-                    .Include(o => o.User)
-                    .FirstOrDefaultAsync(o => o.Id == order.Id);
-
-                var response = new OrderResponseDto
-                {
-                    Id = savedOrder.Id,
-                    Username = user.Username,
-                    OrderDate = savedOrder.OrderDate,
-                    TotalPrice = savedOrder.TotalPrice,
-                    Items = savedOrder.Items.Select(i => new OrderItemResponseDto
-                    {
-                        Id = i.Id,
-                        AccountId = i.AccountId,
-                        Username = i.Order?.User?.Username ?? "Unknown",
-                        ProductName = i.Account?.Product?.Name ?? string.Empty,
-                        Specification = i.Account?.Specification ?? string.Empty,
-                        Quantity = i.Quantity,
-                        SubPrice = i.SubPrice
-                    }).ToList()
-                };
-
-
-
-                return Ok(response);
             }
-            catch (Exception ex)
-            {
-                // Rollback transaksi jika ada error
-                await transaction.RollbackAsync();
-                return StatusCode(500, $"Terjadi kesalahan saat membuat order: {ex.Message}");
-            }
+
+            order.TotalPrice = order.Items.Sum(i => i.SubPrice);
+            await _context.SaveChangesAsync();
+
+            return Ok(ToDto(order));
         }
 
-            
-        //Customer lihat riwayat orderannya
-            
-        [HttpGet("my-orders")]
-        [Authorize(Roles =  "Customer")]
-        public async Task<ActionResult<IEnumerable<OrderResponseDto>>> GetMyOrders()
+        // 2. Customer lihat cart
+        [HttpGet("my-cart")]
+        [Authorize(Roles = "Customer")]
+        public async Task<ActionResult<OrderResponseDto>> GetMyCart()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var usernameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-            if (userIdClaim == null) return Unauthorized("User tidak valid.");
-            int userId = int.Parse(userIdClaim);
-            string username = usernameClaim ?? "unknown";
-
-            var orders = await _context.Orders
+            var order = await _context.Orders
                 .Include(o => o.Items).ThenInclude(i => i.Account).ThenInclude(a => a.Product)
-                .Where(o => o.UserId == userId)
-                .ToListAsync();
+                .Include(o => o.User)
+                .Include(o => o.Items).ThenInclude(i => i.Credentials)
+                .FirstOrDefaultAsync(o => o.UserId == userId && o.Status == "Cart");
 
-            var response = orders.Select(o => new OrderResponseDto
+            if (order == null) return Ok(null);
+
+            return Ok(ToDto(order));
+        }
+
+        // 3. Checkout
+        [HttpPut("checkout/{orderId}")]
+        [Authorize(Roles = "Customer")]
+        public async Task<IActionResult> Checkout(int orderId)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            var order = await _context.Orders
+                .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId && o.Status == "Cart");
+
+            if (order == null) return BadRequest("Keranjang tidak ditemukan.");
+
+            order.Status = "Pending";
+            order.OrderDate = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(ToDto(order));
+        }
+
+        // 4. Admin approve order + simpan credentials
+        [HttpPut("approve")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ApproveOrder([FromBody] ApproveOrderDto dto)
+        {
+            var order = await _context.Orders
+                .Include(o => o.Items).ThenInclude(i => i.Credentials)
+                .Include(o => o.User)
+                .Include(o => o.Items).ThenInclude(i => i.Account)
+                .FirstOrDefaultAsync(o => o.Id == dto.OrderId);
+
+            if (order == null || order.Status != "Pending")
+                return BadRequest("Order tidak valid.");
+
+            var customer = order.User!;
+            var admin = await _context.Users.FirstOrDefaultAsync(u => u.Role == "Admin");
+
+            if (customer.Saldo < order.TotalPrice)
+                return BadRequest("Saldo customer tidak cukup.");
+
+            // saldo customer berkurang
+            customer.Saldo -= order.TotalPrice;
+
+            // stok berkurang
+            foreach (var item in order.Items)
             {
-                Id = o.Id,
-                Username = username,
-                OrderDate = o.OrderDate,
-                TotalPrice = o.TotalPrice,
-                Items = o.Items.Select(i => new OrderItemResponseDto
-                {
-                    Id = i.Id,
-                    AccountId = i.AccountId,
-                    Username = username,
-                    ProductName = i.Account?.Product?.Name ?? string.Empty,
-                    Specification = i.Account?.Specification ?? string.Empty,
-                    Quantity = i.Quantity,
-                    SubPrice = i.SubPrice
-                }).ToList()
+                var account = await _context.Accounts.FindAsync(item.AccountId);
+                if (account == null) continue;
+                if (account.Count < item.Quantity)
+                    return BadRequest($"Stok {account.Specification} tidak cukup.");
+                account.Count -= item.Quantity;
+            }
+
+            // saldo admin bertambah
+            if (admin != null) admin.Saldo += order.TotalPrice;
+
+            // simpan transaksi
+            _context.Transactions.Add(new Transaction
+            {
+                UserId = customer.Id,
+                Amount = order.TotalPrice,
+                Type = "Saldo Keluar",
+                Description = $"Saldo customer {customer.Username} berkurang {order.TotalPrice} untuk order #{order.Id}",
+                TransactionDate = DateTime.UtcNow
             });
 
-            
+            if (admin != null)
+            {
+                _context.Transactions.Add(new Transaction
+                {
+                    UserId = admin.Id,
+                    Amount = order.TotalPrice,
+                    Type = "Saldo Masuk",
+                    Description = $"Saldo admin bertambah {order.TotalPrice} dari customer {customer.Username}",
+                    TransactionDate = DateTime.UtcNow
+                });
+            }
 
-            return Ok(response);
+            // simpan credentials per order item
+            foreach (var delivery in dto.Deliveries)
+            {
+                var item = order.Items.FirstOrDefault(i => i.Id == delivery.OrderItemId);
+                if (item != null)
+                {
+                    foreach (var cred in delivery.Credentials)
+                    {
+                        var newCred = new DeliveryCredential
+                        {
+                            OrderItemId = item.Id,
+                            Email = cred.Email,
+                            Password = cred.Password
+                        };
+                        _context.DeliveryCredentials.Add(newCred);
+                    }
+                }
+            }
+
+            order.Status = "Completed";
+            order.OrderDate = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(ToDto(order));
         }
 
-        //Admin lihat semua order
+        // 5. Admin lihat semua order
         [HttpGet("all")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<OrderResponseDto>>> GetAllOrders()
         {
             var orders = await _context.Orders
                 .Include(o => o.Items).ThenInclude(i => i.Account).ThenInclude(a => a.Product)
+                .Include(o => o.Items).ThenInclude(i => i.Credentials)
                 .Include(o => o.User)
                 .ToListAsync();
 
-            var response = orders.Select(o => new OrderResponseDto
+            return Ok(orders.Select(o => ToDto(o)));
+        }
+
+        // 6. Customer lihat semua pesanan (riwayat)
+        [HttpGet("my-orders")]
+        [Authorize(Roles = "Customer")]
+        public async Task<ActionResult<IEnumerable<OrderResponseDto>>> GetMyOrders()
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            var orders = await _context.Orders
+                .Include(o => o.User)
+                .Include(o => o.Items).ThenInclude(i => i.Account).ThenInclude(a => a.Product)
+                .Include(o => o.Items).ThenInclude(i => i.Credentials)
+                .Where(o => o.UserId == userId)
+                .ToListAsync();
+
+            return Ok(orders.Select(o => ToDto(o)));
+        }
+
+        // 🔹 Helper converter ke DTO
+        private OrderResponseDto ToDto(Order o)
+        {
+            return new OrderResponseDto
             {
                 Id = o.Id,
                 Username = o.User?.Username ?? "unknown",
                 OrderDate = o.OrderDate,
                 TotalPrice = o.TotalPrice,
+                Status = o.Status,
                 Items = o.Items.Select(i => new OrderItemResponseDto
                 {
                     Id = i.Id,
                     AccountId = i.AccountId,
-                    //Username = i.Order?.User?.Username ?? "Unknown",
+                    Username = i.Order?.User?.Username ?? "Unknown",
                     ProductName = i.Account?.Product?.Name ?? string.Empty,
                     Specification = i.Account?.Specification ?? string.Empty,
                     Quantity = i.Quantity,
-                    SubPrice = i.SubPrice
+                    SubPrice = i.SubPrice,
+                    Credentials = i.Credentials.Select(c => new CredentialDto
+                    {
+                        Email = c.Email,
+                        Password = c.Password
+                    }).ToList()
                 }).ToList()
-            });
-
-            return Ok(response);
+            };
         }
     }
 }

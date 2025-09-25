@@ -42,7 +42,6 @@ namespace NexaProAPI.Controllers
                 AccountId = oi.AccountId,
                 ProductName = oi.Account?.Product?.Name ?? string.Empty,
                 Specification = oi.Account?.Specification ?? string.Empty,
-                Quantity = oi.Quantity,
                 SubPrice = oi.SubPrice
             });
             return Ok(response);
@@ -68,7 +67,6 @@ namespace NexaProAPI.Controllers
                 AccountId = oi.AccountId,
                 ProductName = oi.Account?.Product?.Name ?? string.Empty,
                 Specification = oi.Account?.Specification ?? string.Empty,
-                Quantity = oi.Quantity,
                 SubPrice = oi.SubPrice,
                 //OrderedBy = oi.Order?.User?.Username ?? "Unknown"
             });

@@ -12,5 +12,8 @@ namespace NexaProAPI.Models
         public decimal TotalPrice { get; set; } //harga total
         public DateTime OrderDate { get; set; }
         public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
+
+        //tambahan untuk status agar menambahkan fitur keranjang dan checkout
+        public string Status { get; set; } = "Card"; // Cart → Pending → Approved/Rejected → Completed
     }
 }

@@ -15,12 +15,13 @@ namespace NexaProAPI.Models
         [Required]
         [Column(TypeName = "decimal(10,2)")]
         public decimal SubPrice { get; set; } //harga asli
-
-        [Required]
         public int Quantity { get; set; }
 
         [Required]
         public int AccountId { get; set; }
         public Account? Account { get; set; }
+
+        // Relasi ke DeliveryCredential
+        public ICollection<DeliveryCredential> Credentials { get; set; } = new List<DeliveryCredential>();
     }
 }

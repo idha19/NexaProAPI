@@ -42,6 +42,7 @@ namespace NexaProAPI.Controllers
                 UserId = customer.Id,
                 Amount = dto.Amount,
                 Type = "Topup",
+                Description = $"Topup saldo sebesar customer {customer.Username} sebesar {dto.Amount}",
                 TransactionDate = DateTime.UtcNow
             });
 
@@ -66,25 +67,25 @@ namespace NexaProAPI.Controllers
         // Customer & Admin cek transaksi pribadi
         [HttpGet("my-transactions")]
         [Authorize(Roles = "Customer,Admin")]
-        public async Task<IActionResult> GetMyTransactions()
+        public async Task<ActionResult<IEnumerable<TransactionDto>>> GetMyTransactions()
         {
-            var username = User.Identity?.Name;
-            var user = await _context.Users.SingleOrDefaultAsync(u => u.Username == username);
-
-            if (user == null) return Unauthorized();
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
             var transactions = await _context.Transactions
-                .Where(t => t.UserId == user.Id)
-                .OrderByDescending(t => t.TransactionDate)
-                .Select(t => new TransactionDto
-                {
-                    Id = t.Id,
-                    UserId = user.Username,
-                    Amount = t.Amount,
-                    Type = t.Type,
-                    TransactionDate = t.TransactionDate
-                })
+               .Include(t => t.User)
+               .Where(t => t.UserId == userId)
+               .OrderByDescending(t => t.TransactionDate)
+               .Select(t => new TransactionDto
+               {
+                   Id = t.Id,
+                   UserId = t.User.Username,
+                   Amount = t.Amount,
+                   Type = t.Type,
+                   Description = t.Description,
+                   TransactionDate = t.TransactionDate
+               })
                 .ToListAsync();
+
 
             return Ok(transactions);
         }
@@ -103,6 +104,7 @@ namespace NexaProAPI.Controllers
                     UserId = t.User != null ? t.User.Username : "Unknown",
                     Amount = t.Amount,
                     Type = t.Type,
+                    Description = t.Description,
                     TransactionDate = t.TransactionDate
                 })
                 .ToListAsync();
